@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+.git
+*.md
+PLAN.md
+자기소개서.md
