@@ -16,7 +16,7 @@
 | 항목 | 값 |
 |------|------|
 | 이름 | `pay-system` |
-| AMI | **Ubuntu 24.04 LTS** (프리티어) |
+| AMI | **Amazon Linux 2023** (프리티어) |
 | 인스턴스 유형 | **t3.medium** (Kafka 때문에 최소 4GB RAM 필요) |
 | 키 페어 | 새로 생성하거나 기존 것 선택 (.pem 파일 다운로드) |
 | 스토리지 | **20 GiB** (gp3) |
@@ -45,7 +45,7 @@
 chmod 400 your-key.pem
 
 # SSH 접속
-ssh -i your-key.pem ubuntu@<EC2-공인-IP>
+ssh -i your-key.pem ec2-user@<EC2-공인-IP>
 ```
 
 ---
@@ -56,13 +56,20 @@ EC2에 접속한 후 아래 명령어를 순서대로 실행합니다.
 
 ### 3-1. 시스템 업데이트
 ```bash
-sudo apt update && sudo apt upgrade -y
+sudo dnf update -y
 ```
 
 ### 3-2. Docker 설치
 ```bash
 # Docker 설치
-curl -fsSL https://get.docker.com | sudo sh
+sudo dnf install -y docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Docker Compose 플러그인 설치
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m) -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # 현재 사용자를 docker 그룹에 추가 (sudo 없이 docker 사용)
 sudo usermod -aG docker $USER
@@ -77,7 +84,7 @@ docker compose version
 
 ### 3-3. Git 설치 & 코드 클론
 ```bash
-sudo apt install -y git
+sudo dnf install -y git
 
 # 프로젝트 클론 (본인의 GitHub 리포 URL로 변경)
 git clone https://github.com/<YOUR_USERNAME>/pay_system.git
