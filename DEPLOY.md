@@ -59,17 +59,18 @@ EC2에 접속한 후 아래 명령어를 순서대로 실행합니다.
 sudo dnf update -y
 ```
 
-### 3-2. Docker 설치
+### 3-2. Docker 설치 (공식 리포지토리)
 ```bash
-# Docker 설치
-sudo dnf install -y docker
+# Docker 공식 리포지토리 추가
+sudo dnf install -y dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+# Docker + Compose + BuildX 설치
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Docker 서비스 시작 및 자동 시작 등록
 sudo systemctl start docker
 sudo systemctl enable docker
-
-# Docker Compose 플러그인 설치
-sudo mkdir -p /usr/local/lib/docker/cli-plugins
-sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m) -o /usr/local/lib/docker/cli-plugins/docker-compose
-sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # 현재 사용자를 docker 그룹에 추가 (sudo 없이 docker 사용)
 sudo usermod -aG docker $USER
