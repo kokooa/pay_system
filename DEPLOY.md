@@ -208,3 +208,4 @@ docker logs pay-kafka
 # 토픽 목록 확인
 docker exec pay-kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
+
