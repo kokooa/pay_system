@@ -7,6 +7,7 @@ import {
   VersionColumn,
   ManyToOne,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { Account } from '../../account/entities/account.entity';
@@ -21,6 +22,7 @@ export enum PaymentStatus {
 }
 
 @Entity('payments')
+@Unique('UQ_user_order', ['userId', 'orderId'])
 export class Payment {
   @PrimaryGeneratedColumn({ type: 'bigint' })
   id: number;

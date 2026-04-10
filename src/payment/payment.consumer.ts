@@ -74,10 +74,8 @@ export class PaymentConsumer implements OnModuleInit, OnModuleDestroy {
         // 재시도
         await this.kafkaProducer.send('payment.requested', {
           key: message.key?.toString(),
-          value: {
-            ...value,
-            headers: { 'retry-count': String(retryCount + 1) },
-          },
+          value,
+          headers: { 'retry-count': String(retryCount + 1) },
         });
         this.logger.warn(
           `Retrying payment ${value.paymentId} (attempt ${retryCount + 1})`,

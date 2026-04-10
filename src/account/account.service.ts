@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Account, AccountStatus } from './entities/account.entity';
 import { CreateAccountDto } from './dto/create-account.dto';
 
@@ -9,6 +9,7 @@ export class AccountService {
   constructor(
     @InjectRepository(Account)
     private readonly accountRepository: Repository<Account>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(userId: number, dto: CreateAccountDto): Promise<Account> {
@@ -49,14 +50,29 @@ export class AccountService {
   async setDefault(id: number, userId: number): Promise<Account> {
     const account = await this.findByIdAndUser(id, userId);
 
-    // 기존 기본계좌 해제
-    await this.accountRepository.update(
-      { userId, isDefault: true },
-      { isDefault: false },
-    );
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    account.isDefault = true;
-    return this.accountRepository.save(account);
+    try {
+      // 기존 기본계좌 해제
+      await queryRunner.manager.update(
+        Account,
+        { userId, isDefault: true },
+        { isDefault: false },
+      );
+
+      account.isDefault = true;
+      const saved = await queryRunner.manager.save(account);
+
+      await queryRunner.commitTransaction();
+      return saved;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async remove(id: number, userId: number): Promise<void> {

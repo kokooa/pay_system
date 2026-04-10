@@ -33,6 +33,9 @@ export class Account {
   @Column({ type: 'boolean', default: false })
   isDefault: boolean;
 
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  balance: number;
+
   @Column({ type: 'boolean', default: false })
   isVerified: boolean;
 

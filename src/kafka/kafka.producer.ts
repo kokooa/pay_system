@@ -33,13 +33,21 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
     await this.producer.disconnect();
   }
 
-  async send(topic: string, message: { key?: string; value: any }) {
+  async send(
+    topic: string,
+    message: {
+      key?: string;
+      value: any;
+      headers?: Record<string, string>;
+    },
+  ) {
     await this.producer.send({
       topic,
       messages: [
         {
           key: message.key,
           value: JSON.stringify(message.value),
+          headers: message.headers,
         },
       ],
     });

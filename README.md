@@ -26,6 +26,7 @@
 ### 안정성 확보
 - **중복 결제 방지** - Redis 멱등성 키 (SETNX, TTL 24h)
 - **동시성 제어** - Redis 분산락 (Lua 스크립트) + TypeORM 낙관적 락 (@VersionColumn)
+- **잔액 관리** - 결제 승인 시 차감, 취소 시 복원 (트랜잭션 내 원자적 처리)
 - **메시지 유실 방지** - Transactional Outbox 패턴 (DB + Kafka 원자적 보장)
 - **장애 복구** - Kafka 재시도 (3회) → DLQ (Dead Letter Queue)
 - **트랜잭션 롤백** - TypeORM QueryRunner 기반 수동 트랜잭션 관리
@@ -65,7 +66,7 @@ src/
 ### Payment
 | Method | Path | 설명 |
 |--------|------|------|
-| POST | `/api/v1/payments` | 결제 요청 (idempotency-key 필수) |
+| POST | `/api/v1/payments` | 결제 요청 (idempotency-key 필수, 최대 1,000만원) |
 | POST | `/api/v1/payments/:paymentKey/cancel` | 결제 취소 |
 | GET | `/api/v1/payments/:paymentKey` | 결제 상세 조회 |
 
@@ -199,8 +200,8 @@ curl http://localhost:3000/api/v1/transactions \
 ## DB 스키마
 
 - **users** - 사용자
-- **accounts** - 계좌 (1:N with users)
-- **payments** - 결제 (멱등성 키, 낙관적 락 version)
+- **accounts** - 계좌 (1:N with users, balance 잔액 관리)
+- **payments** - 결제 (멱등성 키, 낙관적 락 version, userId+orderId 복합 유니크)
 - **transactions** - 거래내역
 - **settlements** - 정산
 - **payment_outbox** - Transactional Outbox (Kafka 발행 보장)

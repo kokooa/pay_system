@@ -12,6 +12,7 @@ import { Payment, PaymentStatus } from './entities/payment.entity';
 import { PaymentOutbox } from './entities/payment-outbox.entity';
 import { Transaction, TransactionType } from '../transaction/entities/transaction.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { Account } from '../account/entities/account.entity';
 import { AccountService } from '../account/account.service';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from '../kafka/kafka.producer';
@@ -40,19 +41,29 @@ export class PaymentService {
     idempotencyKey: string,
   ): Promise<Payment> {
     // 1. 멱등성 키 확인 (중복 결제 방지)
+    const existingValue =
+      await this.redisService.getIdempotencyKey(idempotencyKey);
+
+    if (existingValue) {
+      // 아직 처리 중인 경우
+      if (existingValue === 'processing') {
+        throw new ConflictException('이미 처리 중인 요청입니다.');
+      }
+      // 처리 완료된 경우 → 기존 결제 반환
+      const existing = await this.paymentRepository.findOne({
+        where: { idempotencyKey },
+      });
+      if (existing) return existing;
+    }
+
+    // 새 요청: processing 상태로 설정
     const isNew = await this.redisService.setIdempotencyKey(
       idempotencyKey,
       'processing',
     );
 
     if (!isNew) {
-      // 이미 처리된 요청 → 기존 결제 반환
-      const existingPaymentId =
-        await this.redisService.getIdempotencyKey(idempotencyKey);
-      const existing = await this.paymentRepository.findOne({
-        where: { idempotencyKey },
-      });
-      if (existing) return existing;
+      // 동시 요청으로 다른 요청이 먼저 키를 설정한 경우
       throw new ConflictException('이미 처리 중인 요청입니다.');
     }
 
@@ -156,13 +167,23 @@ export class PaymentService {
         payment.approvedAt = new Date();
         await queryRunner.manager.save(payment);
 
+        // 계좌 잔액 차감
+        const account = await queryRunner.manager.findOneBy(Account, {
+          id: payment.accountId,
+        });
+        if (!account) {
+          throw new NotFoundException('계좌를 찾을 수 없습니다.');
+        }
+        account.balance = Number(account.balance) - Number(payment.amount);
+        await queryRunner.manager.save(account);
+
         // 거래내역 생성
         const transaction = queryRunner.manager.create(Transaction, {
           paymentId: payment.id,
           userId: payment.userId,
           type: TransactionType.PAYMENT,
           amount: payment.amount,
-          balanceAfter: 0, // 실제로는 잔액 계산 필요
+          balanceAfter: account.balance,
           description: `결제 승인 (주문: ${payment.orderId})`,
         });
         await queryRunner.manager.save(transaction);
@@ -210,15 +231,27 @@ export class PaymentService {
     await queryRunner.startTransaction();
 
     try {
+      const previousStatus = payment.status;
+
       payment.status = PaymentStatus.CANCELLED;
       await queryRunner.manager.save(payment);
+
+      // 승인된 결제 취소 시 계좌 잔액 복원
+      const account = await queryRunner.manager.findOneBy(Account, {
+        id: payment.accountId,
+      });
+
+      if (previousStatus === PaymentStatus.APPROVED && account) {
+        account.balance = Number(account.balance) + Number(payment.amount);
+        await queryRunner.manager.save(account);
+      }
 
       const transaction = queryRunner.manager.create(Transaction, {
         paymentId: payment.id,
         userId: payment.userId,
         type: TransactionType.CANCEL,
         amount: payment.amount,
-        balanceAfter: 0,
+        balanceAfter: account ? Number(account.balance) : 0,
         description: `결제 취소 (주문: ${payment.orderId})`,
       });
       await queryRunner.manager.save(transaction);

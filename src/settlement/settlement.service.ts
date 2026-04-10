@@ -38,7 +38,8 @@ export class SettlementService {
       return null;
     }
 
-    const feeAmount = Math.round(totalAmount * SettlementService.FEE_RATE);
+    // 정수 연산으로 부동소수점 오차 방지 (수수료율 3.3% = 33/1000)
+    const feeAmount = Math.round((totalAmount * 33) / 1000);
     const netAmount = totalAmount - feeAmount;
 
     const settlement = this.settlementRepository.create({
